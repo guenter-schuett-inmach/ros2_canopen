@@ -277,13 +277,13 @@ void NodeCanopen402Driver<NODETYPE>::configure_common()
   {
   }
 
-  scale_pos_to_dev_ = scale_pos_to_dev.value_or(1000.0);
-  scale_pos_from_dev_ = scale_pos_from_dev.value_or(0.001);
-  scale_vel_to_dev_ = scale_vel_to_dev.value_or(1000.0);
-  scale_vel_from_dev_ = scale_vel_from_dev.value_or(0.001);
-  scale_eff_from_dev_ = scale_eff_from_dev.value_or(0.001);
-  offset_pos_to_dev_ = offset_pos_to_dev.value_or(0.0);
-  offset_pos_from_dev_ = offset_pos_from_dev.value_or(0.0);
+  double scale_pos_to_dev_ = scale_pos_to_dev.value_or(1000.0);
+  double scale_pos_from_dev_ = scale_pos_from_dev.value_or(0.001);
+  double scale_vel_to_dev_ = scale_vel_to_dev.value_or(1000.0);
+  double scale_vel_from_dev_ = scale_vel_from_dev.value_or(0.001);
+  double scale_eff_from_dev_ = scale_eff_from_dev.value_or(0.001);
+  double offset_pos_to_dev_ = offset_pos_to_dev.value_or(0.0);
+  double offset_pos_from_dev_ = offset_pos_from_dev.value_or(0.0);
   switching_state_ = (ros2_canopen::State402::InternalState)switching_state.value_or(
     (int)ros2_canopen::State402::InternalState::Operation_Enable);
   homing_timeout_seconds_ = homing_timeout_seconds.value_or(10);
@@ -316,12 +316,9 @@ void NodeCanopen402Driver<NODETYPE>::configure_common()
   }
 
   // Generate default names if not provided
-  if (channel_names_.empty())
+  for (uint8_t i = channel_names_.size(); i < num_channels_; ++i)
   {
-    for (uint8_t i = 0; i < num_channels_; ++i)
-    {
-      channel_names_.push_back(std::string(this->node_->get_name()) + "/" + std::to_string(i));
-    }
+      channel_names_.push_back(std::string(this->node_->get_name()) + "/ch" + std::to_string(i));
   }
 
   // Resolve per-channel scales/offsets into per-channel contexts
@@ -336,6 +333,9 @@ void NodeCanopen402Driver<NODETYPE>::configure_common()
     channels_[i].scale_eff_from_dev = scale_eff_from_dev_;
     channels_[i].offset_pos_to_dev = offset_pos_to_dev_;
     channels_[i].offset_pos_from_dev = offset_pos_from_dev_;
+
+    channels_[i].axle = i;
+    channels_[i].name = (i < channel_names_.size()) ? channel_names_[i] : ( "ch" + std::to_string(i) );
   }
 
   try
@@ -391,6 +391,20 @@ void NodeCanopen402Driver<NODETYPE>::configure_common()
         try
         {
           channels_[i].offset_pos_from_dev = ch["offset_pos_from_dev"].template as<double>();
+        }
+        catch (...)
+        {
+        }
+        try
+        {
+          channels_[i].axle = ch["axle"].template as<double>();
+        }
+        catch (...)
+        {
+        }
+        try
+        {
+          channels_[i].name = ch["name"].template as<std::string>();
         }
         catch (...)
         {
@@ -514,8 +528,14 @@ void NodeCanopen402Driver<NODETYPE>::add_to_master()
   channels_.resize(num_channels_);
   for (uint8_t ch = 0; ch < num_channels_; ++ch)
   {
+    // uint8_t idx = (0 == ch) ? 4 : ch;
+    uint8_t idx = channels_[ch].axle;
+    RCLCPP_INFO(
+       this->node_->get_logger(),
+       "add_to_master() ch %u idx %u as %s"
+       , ch, idx, channels_[ch].name.c_str() );
     channels_[ch].motor =
-      std::make_shared<Motor402>(this->lely_driver_, switching_state_, homing_timeout_seconds_, ch);
+      std::make_shared<Motor402>(this->lely_driver_, switching_state_, homing_timeout_seconds_, idx);
   }
 }
 
