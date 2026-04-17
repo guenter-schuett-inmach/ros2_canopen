@@ -58,6 +58,9 @@ protected:
     double offset_pos_to_dev{0.0};
     double offset_pos_from_dev{0.0};
 
+    uint8_t axle;
+    std::string name;
+
     // Per-channel service handles (kept alive by owning SharedPtr)
     rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr handle_init;
     rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr handle_enable;
@@ -81,15 +84,6 @@ protected:
   rclcpp::TimerBase::SharedPtr timer_;
 
   rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr publish_joint_state;
-
-  // Global scale/offset (used as defaults)
-  double scale_pos_to_dev_;
-  double scale_pos_from_dev_;
-  double scale_vel_to_dev_;
-  double scale_vel_from_dev_;
-  double scale_eff_from_dev_;
-  double offset_pos_to_dev_;
-  double offset_pos_from_dev_;
 
   ros2_canopen::State402::InternalState switching_state_;
   int homing_timeout_seconds_;
