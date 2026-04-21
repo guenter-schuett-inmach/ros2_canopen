@@ -59,7 +59,6 @@ protected:
     double offset_pos_from_dev{0.0};
 
     uint8_t axle;
-    std::string name;
 
     // Per-channel service handles (kept alive by owning SharedPtr)
     rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr handle_init;
@@ -79,6 +78,7 @@ protected:
 
   std::vector<ChannelContext> channels_;
   uint8_t num_channels_;
+  bool use_legacy_;
   std::vector<std::string> channel_names_;
 
   rclcpp::TimerBase::SharedPtr timer_;

@@ -72,7 +72,7 @@ void NodeCanopen402Driver<NODETYPE>::create_per_channel_services()
     // - Single-channel (num_channels_ == 1): Use legacy names like "init", "target", etc.
     // - Multi-channel: Use channel_name as prefix like "channel_name/init"
     std::string service_prefix;
-    if (num_channels_ == 1)
+    if (num_channels_ == 1 && use_legacy_)
     {
       // Single-channel: legacy behavior
       service_prefix = std::string(this->node_->get_name()) + "/";
@@ -210,6 +210,7 @@ void NodeCanopen402Driver<NODETYPE>::configure_common()
   std::optional<double> scale_eff_from_dev;
   std::optional<double> offset_pos_to_dev;
   std::optional<double> offset_pos_from_dev;
+  std::optional<int> axle_nbr;
   std::optional<int> switching_state;
   std::optional<int> homing_timeout_seconds;
   try
@@ -263,6 +264,12 @@ void NodeCanopen402Driver<NODETYPE>::configure_common()
   }
   try
   {
+    axle_nbr = std::optional(this->config_["axle"].template as<int>());
+  }
+  catch (...)
+  {
+  }try
+  {
     switching_state = std::optional(this->config_["switching_state"].template as<int>());
   }
   catch (...)
@@ -277,13 +284,13 @@ void NodeCanopen402Driver<NODETYPE>::configure_common()
   {
   }
 
-  double scale_pos_to_dev_ = scale_pos_to_dev.value_or(1000.0);
-  double scale_pos_from_dev_ = scale_pos_from_dev.value_or(0.001);
-  double scale_vel_to_dev_ = scale_vel_to_dev.value_or(1000.0);
-  double scale_vel_from_dev_ = scale_vel_from_dev.value_or(0.001);
-  double scale_eff_from_dev_ = scale_eff_from_dev.value_or(0.001);
-  double offset_pos_to_dev_ = offset_pos_to_dev.value_or(0.0);
-  double offset_pos_from_dev_ = offset_pos_from_dev.value_or(0.0);
+  double scale_pos_to_dev_value = scale_pos_to_dev.value_or(1000.0);
+  double scale_pos_from_dev_value = scale_pos_from_dev.value_or(0.001);
+  double scale_vel_to_dev_value = scale_vel_to_dev.value_or(1000.0);
+  double scale_vel_from_dev_value = scale_vel_from_dev.value_or(0.001);
+  double scale_eff_from_dev_value = scale_eff_from_dev.value_or(0.001);
+  double offset_pos_to_dev_value = offset_pos_to_dev.value_or(0.0);
+  double offset_pos_from_dev_value = offset_pos_from_dev.value_or(0.0);
   switching_state_ = (ros2_canopen::State402::InternalState)switching_state.value_or(
     (int)ros2_canopen::State402::InternalState::Operation_Enable);
   homing_timeout_seconds_ = homing_timeout_seconds.value_or(10);
@@ -297,6 +304,7 @@ void NodeCanopen402Driver<NODETYPE>::configure_common()
   catch (...)
   {
   }
+  use_legacy_ = (1 == num_channels_) && (!axle_nbr.has_value());
 
   // Parse channel names
   channel_names_.clear();
@@ -326,17 +334,16 @@ void NodeCanopen402Driver<NODETYPE>::configure_common()
   channels_.resize(num_channels_);
   for (uint8_t i = 0; i < num_channels_; ++i)
   {
-    channels_[i].scale_pos_to_dev = scale_pos_to_dev_;
-    channels_[i].scale_pos_from_dev = scale_pos_from_dev_;
-    channels_[i].scale_vel_to_dev = scale_vel_to_dev_;
-    channels_[i].scale_vel_from_dev = scale_vel_from_dev_;
-    channels_[i].scale_eff_from_dev = scale_eff_from_dev_;
-    channels_[i].offset_pos_to_dev = offset_pos_to_dev_;
-    channels_[i].offset_pos_from_dev = offset_pos_from_dev_;
+    channels_[i].scale_pos_to_dev = scale_pos_to_dev_value;
+    channels_[i].scale_pos_from_dev = scale_pos_from_dev_value;
+    channels_[i].scale_vel_to_dev = scale_vel_to_dev_value;
+    channels_[i].scale_vel_from_dev = scale_vel_from_dev_value;
+    channels_[i].scale_eff_from_dev = scale_eff_from_dev_value;
+    channels_[i].offset_pos_to_dev = offset_pos_to_dev_value;
+    channels_[i].offset_pos_from_dev = offset_pos_from_dev_value;
 
-    channels_[i].axle = i;
-    channels_[i].name = (i < channel_names_.size()) ? channel_names_[i] : ( "ch" + std::to_string(i) );
-  }
+    channels_[i].axle = axle_nbr.value_or(i);
+   }
 
   try
   {
@@ -398,13 +405,7 @@ void NodeCanopen402Driver<NODETYPE>::configure_common()
         try
         {
           channels_[i].axle = ch["axle"].template as<double>();
-        }
-        catch (...)
-        {
-        }
-        try
-        {
-          channels_[i].name = ch["name"].template as<std::string>();
+          use_legacy_ = false;
         }
         catch (...)
         {
@@ -422,8 +423,8 @@ void NodeCanopen402Driver<NODETYPE>::configure_common()
     "%f\nscale_vel_from_dev_ "
     "%f\nscale_eff_from_dev_ %f\noffset_pos_to_dev_ %f\noffset_pos_from_dev_ "
     "%f\nhoming_timeout_seconds_ %i\n",
-    num_channels_, scale_pos_to_dev_, scale_pos_from_dev_, scale_vel_to_dev_, scale_vel_from_dev_,
-    scale_eff_from_dev_, offset_pos_to_dev_, offset_pos_from_dev_, homing_timeout_seconds_);
+    num_channels_, scale_pos_to_dev_value, scale_pos_from_dev_value, scale_vel_to_dev_value, scale_vel_from_dev_value,
+    scale_eff_from_dev_value, offset_pos_to_dev_value, offset_pos_from_dev_value, homing_timeout_seconds_);
 
   // Create per-channel services
   create_per_channel_services();
@@ -483,7 +484,7 @@ void NodeCanopen402Driver<NODETYPE>::publish()
   for (size_t ch = 0; ch < channels_.size(); ++ch)
   {
     std::string name;
-    if (num_channels_ == 1)
+    if (num_channels_ == 1 && use_legacy_)
     {
       // Single-channel: use node name (legacy behavior)
       name = std::string(this->node_->get_name());
@@ -530,12 +531,24 @@ void NodeCanopen402Driver<NODETYPE>::add_to_master()
   {
     // uint8_t idx = (0 == ch) ? 4 : ch;
     uint8_t idx = channels_[ch].axle;
-    RCLCPP_INFO(
-       this->node_->get_logger(),
-       "add_to_master() ch %u idx %u as %s"
-       , ch, idx, channels_[ch].name.c_str() );
-    channels_[ch].motor =
-      std::make_shared<Motor402>(this->lely_driver_, switching_state_, homing_timeout_seconds_, idx);
+    if(idx <= 7)
+    {
+      RCLCPP_INFO(
+        this->node_->get_logger(),
+         "add_to_master() ch %u idx %u as %s"
+         , ch, idx, channel_names_[ch].c_str() );
+      channels_[ch].motor =
+        std::make_shared<Motor402>(this->lely_driver_, switching_state_, homing_timeout_seconds_, idx);
+    }
+    else
+    {
+      RCLCPP_WARN(
+        this->node_->get_logger(),
+         "%s() ch %u idx %u as %s ignored"
+         , __func__
+         , ch, idx, channel_names_[ch].c_str() );
+      channels_[ch].motor = 0;
+    }
   }
 }
 
