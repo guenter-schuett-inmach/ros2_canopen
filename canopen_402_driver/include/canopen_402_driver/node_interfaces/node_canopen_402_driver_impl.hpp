@@ -268,7 +268,8 @@ void NodeCanopen402Driver<NODETYPE>::configure_common()
   }
   catch (...)
   {
-  }try
+  }
+  try
   {
     switching_state = std::optional(this->config_["switching_state"].template as<int>());
   }
@@ -326,7 +327,7 @@ void NodeCanopen402Driver<NODETYPE>::configure_common()
   // Generate default names if not provided
   for (uint8_t i = channel_names_.size(); i < num_channels_; ++i)
   {
-      channel_names_.push_back(std::string(this->node_->get_name()) + "/ch" + std::to_string(i));
+    channel_names_.push_back(std::string(this->node_->get_name()) + "/ch" + std::to_string(i));
   }
 
   // Resolve per-channel scales/offsets into per-channel contexts
@@ -343,7 +344,7 @@ void NodeCanopen402Driver<NODETYPE>::configure_common()
     channels_[i].offset_pos_from_dev = offset_pos_from_dev_value;
 
     channels_[i].axle = axle_nbr.value_or(i);
-   }
+  }
 
   try
   {
@@ -423,8 +424,9 @@ void NodeCanopen402Driver<NODETYPE>::configure_common()
     "%f\nscale_vel_from_dev_ "
     "%f\nscale_eff_from_dev_ %f\noffset_pos_to_dev_ %f\noffset_pos_from_dev_ "
     "%f\nhoming_timeout_seconds_ %i\n",
-    num_channels_, scale_pos_to_dev_value, scale_pos_from_dev_value, scale_vel_to_dev_value, scale_vel_from_dev_value,
-    scale_eff_from_dev_value, offset_pos_to_dev_value, offset_pos_from_dev_value, homing_timeout_seconds_);
+    num_channels_, scale_pos_to_dev_value, scale_pos_from_dev_value, scale_vel_to_dev_value,
+    scale_vel_from_dev_value, scale_eff_from_dev_value, offset_pos_to_dev_value,
+    offset_pos_from_dev_value, homing_timeout_seconds_);
 
   // Create per-channel services
   create_per_channel_services();
@@ -531,22 +533,19 @@ void NodeCanopen402Driver<NODETYPE>::add_to_master()
   {
     // uint8_t idx = (0 == ch) ? 4 : ch;
     uint8_t idx = channels_[ch].axle;
-    if(idx <= 7)
+    if (idx <= 7)
     {
       RCLCPP_INFO(
-        this->node_->get_logger(),
-         "add_to_master() ch %u idx %u as %s"
-         , ch, idx, channel_names_[ch].c_str() );
-      channels_[ch].motor =
-        std::make_shared<Motor402>(this->lely_driver_, switching_state_, homing_timeout_seconds_, idx);
+        this->node_->get_logger(), "add_to_master() ch %u idx %u as %s", ch, idx,
+        channel_names_[ch].c_str());
+      channels_[ch].motor = std::make_shared<Motor402>(
+        this->lely_driver_, switching_state_, homing_timeout_seconds_, idx);
     }
     else
     {
       RCLCPP_WARN(
-        this->node_->get_logger(),
-         "%s() ch %u idx %u as %s ignored"
-         , __func__
-         , ch, idx, channel_names_[ch].c_str() );
+        this->node_->get_logger(), "%s() ch %u idx %u as %s ignored", __func__, ch, idx,
+        channel_names_[ch].c_str());
       channels_[ch].motor = 0;
     }
   }
